@@ -49,6 +49,10 @@ def summarize_with_langchain(file):
 
         summary = chain.run(input_documents=texts)
         return summary
+    except OSError as e:
+        if "libGL.so.1" in str(e):
+            return "Error during summarization: libGL.so.1: cannot open shared object file: No such file or directory"
+        return f"Error during summarization: {e}"
     except Exception as e:
         return f"Error during summarization: {e}"
 
