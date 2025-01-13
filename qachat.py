@@ -1,23 +1,47 @@
-from dotenv import load_dotenv
 import streamlit as st
+
+# Set Streamlit page configuration
+st.set_page_config(page_title="PhishNet AI", layout="wide")
+
+from dotenv import load_dotenv
 import os
 import google.generativeai as genai
 import numpy as np
 import pickle
-from FeatureExtraction import FeatureExtraction
+from Feature import FeatureExtraction
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from langchain_utils import summarize_with_langchain, qa_with_langchain  # Import LangChain functions
 from urllib.parse import urlparse
+from login import login_page, otp_page, register_page, ApplicationLayer, DatabaseLayer  # Import login functionality
 
-# Set Streamlit page configuration
-st.set_page_config(page_title="PhishNet AI", layout="wide")
+try:
+    from langchain_community.document_loaders import UnstructuredFileLoader
+except ImportError:
+    raise ImportError("The 'unstructured' package is not found. Please install it with 'pip install unstructured'.")
 
 # Load environment variables
 load_dotenv()
 
 genai.configure(api_key="AIzaSyA7Q2_eC2-RXD9sG1rZjMl2FqE0eMQwkB0")  # Your provided API key
+
+# Initialize layers
+db_layer = DatabaseLayer()
+app_layer = ApplicationLayer(db_layer)
+
+# Authentication
+if st.session_state.page == "login":
+    login_page(app_layer)
+    st.stop()
+elif st.session_state.page == "register":
+    register_page(app_layer)
+    st.stop()
+elif st.session_state.page == "otp":
+    otp_page(app_layer)
+    st.stop()
+elif st.session_state.page == "main":
+    pass  # Continue to the chatbot
 
 # Function to load Gemini Pro model and get responses
 @st.cache_resource
@@ -37,7 +61,7 @@ def get_gemini_response(question):
 # Train or Load the Phishing Detection Model
 @st.cache_resource
 def train_and_save_model():
-    dataset_path = 'phishing.csv'  # Update this path if necessary
+    dataset_path = 'D:\\chatbot\\phishing.csv'  # Update this path if necessary
     try:
         data = pd.read_csv(dataset_path)
     except FileNotFoundError:
@@ -56,14 +80,14 @@ def train_and_save_model():
     model.fit(X_train, y_train)
 
     # Save the trained model
-    with open('model.pkl', 'wb') as file:
+    with open('D:\\chatbot\\model.pkl', 'wb') as file:
         pickle.dump(model, file)
     
     return model
 
 # Load existing model or train a new one if not found
 try:
-    with open('model.pkl', 'rb') as model_file:
+    with open('D:\\chatbot\\model.pkl', 'rb') as model_file:
         phishing_model = pickle.load(model_file)
 except (FileNotFoundError, EOFError):
     phishing_model = train_and_save_model()
