@@ -31,11 +31,12 @@ def summarize_with_langchain(file):
     """
     try:
         # Save the uploaded file to a temporary location
-        with open(file.name, "wb") as f:
+        temp_file_path = os.path.join("/tmp", file.name)
+        with open(temp_file_path, "wb") as f:
             f.write(file.getbuffer())
 
         # Load the document
-        loader = UnstructuredFileLoader(file.name)
+        loader = UnstructuredFileLoader(temp_file_path)
         documents = loader.load()
 
         # Split the text into chunks
