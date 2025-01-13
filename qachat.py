@@ -1,3 +1,4 @@
+from streamlit_login_auth_ui.widgets import __login__
 from dotenv import load_dotenv
 import streamlit as st
 import os
@@ -135,7 +136,21 @@ def add_custom_css():
 add_custom_css()
 
 # Streamlit UI setup
-st.header("PhishNet AI: Chatbot with Phishing Detector")
+st.title("💬 PhishNetUI - Chatbot with Phishing Detector")
+st.caption("🚀 A Streamlit chatbot powered by Google Gemini AI")
+
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+if prompt := st.chat_input():
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.chat_message("user").write(prompt)
+    response = get_gemini_response(prompt)
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.chat_message("assistant").write(response)
 
 # Tabs for organization
 tab1, tab2, tab3 = st.tabs(["Chatbot", "Phishing Detection", "LangChain Features"])
