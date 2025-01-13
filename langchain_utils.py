@@ -2,7 +2,17 @@ from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.llms import OpenAI
 from langchain.chains import load_chain
-import streamlit as st
+import os
+
+# Error handling for Streamlit import
+try:
+    import streamlit as st
+except ImportError as e:
+    print(f"Streamlit is not installed: {e}")
+    st = None
+
+# Initialize OpenAI API key
+os.environ["OPENAI_API_KEY"] = "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"
 
 # Initialize LLM and chains once
 @st.cache_resource
