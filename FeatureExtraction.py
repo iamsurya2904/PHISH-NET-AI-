@@ -2,10 +2,8 @@ import ipaddress
 import re
 import urllib.request
 from bs4 import BeautifulSoup
-from googlesearch import search
 import socket
 import requests
-from googlesearch import search
 import whois
 from datetime import date, datetime
 import time
@@ -445,7 +443,7 @@ class FeatureExtraction:
     # 28. GoogleIndex
     def GoogleIndex(self):
         try:
-            site = search(self.url, 5)
+            site = self.google_search(self.url)
             if site:
                 return 1
             else:
@@ -488,3 +486,21 @@ class FeatureExtraction:
     
     def getFeaturesList(self):
         return self.features
+
+    def google_search(self, query):
+        search_url = f"https://www.google.com/search?q={query}"
+        response = requests.get(search_url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        for g in soup.find_all(class_='BVG0Nb'):
+            results.append(g.text)
+        return results
+
+def search(query, num_results=10):
+    search_url = f"https://www.google.com/search?q={query}&num={num_results}"
+    response = requests.get(search_url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    results = []
+    for g in soup.find_all('div', class_='BNeawe UPmit AP7Wnd'):
+        results.append(g.text)
+    return results
