@@ -8,4 +8,4 @@ langchain-community
 whois
 bs4
 googlesearch-python
-unstructured
+unstructured[docx,pdf,image,ppt,json,html,xml,xls,log,csv,tsv,txt,conf,ini,cfg,archive,exe,script]
