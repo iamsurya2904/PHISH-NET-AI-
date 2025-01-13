@@ -1,4 +1,3 @@
-from streamlit_login_auth_ui.widgets import __login__
 from dotenv import load_dotenv
 import streamlit as st
 import os
