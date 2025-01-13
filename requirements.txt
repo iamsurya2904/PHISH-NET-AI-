@@ -7,3 +7,4 @@ scikit-learn
 langchain-community
 whois
 bs4
+googlesearch-python
