@@ -1,3 +1,4 @@
+from streamlit_login_auth_ui.widgets import __login__
 from dotenv import load_dotenv
 import streamlit as st
 import os
@@ -135,7 +136,7 @@ def add_custom_css():
 add_custom_css()
 
 # Streamlit UI setup
-st.title("💬 PhishNetUI - Chatbot with Phishing Detector")
+st.title("💬 PhishNet AI - Chatbot with Phishing Detection")
 st.caption("🚀 A Streamlit chatbot powered by Google Gemini AI")
 
 if "messages" not in st.session_state:
