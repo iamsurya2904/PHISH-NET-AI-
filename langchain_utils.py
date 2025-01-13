@@ -1,15 +1,9 @@
-from langchain.document_loaders import UnstructuredFileLoader
+from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.llms import OpenAI
+from langchain_community.llms import OpenAI
 from langchain.chains import load_chain
 import os
-
-# Error handling for Streamlit import
-try:
-    import streamlit as st
-except ImportError as e:
-    print(f"Streamlit is not installed: {e}")
-    st = None
+import streamlit as st
 
 # Initialize OpenAI API key
 os.environ["OPENAI_API_KEY"] = "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"
@@ -36,8 +30,12 @@ def summarize_with_langchain(file):
         str: A summary of the document.
     """
     try:
+        # Save the uploaded file to a temporary location
+        with open(file.name, "wb") as f:
+            f.write(file.getbuffer())
+
         # Load the document
-        loader = UnstructuredFileLoader(file)
+        loader = UnstructuredFileLoader(file.name)
         documents = loader.load()
 
         # Split the text into chunks
