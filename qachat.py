@@ -9,6 +9,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from langchain_utils import summarize_with_langchain, qa_with_langchain  # Import LangChain functions
+from urllib.parse import urlparse
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="PhishNet AI", layout="wide")
@@ -16,7 +17,6 @@ st.set_page_config(page_title="PhishNet AI", layout="wide")
 # Load environment variables
 load_dotenv()
 
-# Configure Google Generative AI with your API key
 genai.configure(api_key="AIzaSyA7Q2_eC2-RXD9sG1rZjMl2FqE0eMQwkB0")  # Your provided API key
 
 # Function to load Gemini Pro model and get responses
@@ -71,6 +71,20 @@ except (FileNotFoundError, EOFError):
 # Function to check if a URL is phishing or safe
 def check_phishing(url):
     try:
+        # Parse the domain from the URL
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+        
+        # Check if the URL is one of the official URLs
+        official_urls = ["google.com", "www.google.com", "linkedin.com", "www.linkedin.com"]
+        if domain in official_urls:
+            return {
+                "is_safe": True,
+                "prob_safe": 100,
+                "prob_phishing": 0
+            }
+
+        # Extract features from the URL
         feature_extractor = FeatureExtraction(url)
         features = np.array(feature_extractor.getFeaturesList()).reshape(1, -1)
 
@@ -135,7 +149,7 @@ def add_custom_css():
 add_custom_css()
 
 # Streamlit UI setup
-st.title("💬 PhishNet AI - Chatbot with Phishing Detection")
+st.title("💬 PhishNetUI - Chatbot with Phishing Detector")
 st.caption("🚀 A Streamlit chatbot powered by Google Gemini AI")
 
 if "messages" not in st.session_state:
@@ -152,7 +166,7 @@ if prompt := st.chat_input():
     st.chat_message("assistant").write(response)
 
 # Tabs for organization
-tab1, tab2, tab3 = st.tabs(["Chatbot", "Phishing Detection", "LangChain Features"])
+tab1, tab2, tab3 = st.tabs(["💬 Chatbot", "🔍 Phishing Detection", "📄 LangChain Features"])
 
 # Chatbot Tab
 with tab1:
