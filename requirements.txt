@@ -7,9 +7,3 @@ scikit-learn
 langchain-community
 whois
 bs4
-os
-googlesearch
-dateurlib.parse
-langchain_utils
-pickle
-
