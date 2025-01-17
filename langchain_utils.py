@@ -6,7 +6,7 @@ import os
 import streamlit as st
 
 # Initialize OpenAI API key
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = ""
 
 # Initialize LLM and chains once
 @st.cache_resource
