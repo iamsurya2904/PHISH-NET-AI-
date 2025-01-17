@@ -24,7 +24,7 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-genai.configure(api_key="AIzaSyA7Q2_eC2-RXD9sG1rZjMl2FqE0eMQwkB0")  # Your provided API key
+genai.configure(api_key="")  # Your provided API key
 
 # Initialize layers
 db_layer = DatabaseLayer()
