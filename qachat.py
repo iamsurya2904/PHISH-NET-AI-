@@ -1,47 +1,28 @@
-import streamlit as st
-
-# Set Streamlit page configuration
-st.set_page_config(page_title="PhishNet AI", layout="wide")
-
 from dotenv import load_dotenv
+import streamlit as st
 import os
 import google.generativeai as genai
 import numpy as np
 import pickle
-from FeatureExtraction import FeatureExtraction
+from Feature import FeatureExtraction
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from langchain_utils import summarize_with_langchain, qa_with_langchain  # Import LangChain functions
 from urllib.parse import urlparse
-from login import login_page, otp_page, register_page, ApplicationLayer, DatabaseLayer  # Import login functionality
 
 try:
     from langchain_community.document_loaders import UnstructuredFileLoader
 except ImportError:
     raise ImportError("The 'unstructured' package is not found. Please install it with 'pip install unstructured'.")
 
+# Set Streamlit page configuration
+st.set_page_config(page_title="PhishNet AI", layout="wide")
+
 # Load environment variables
 load_dotenv()
 
 genai.configure(api_key="AIzaSyA7Q2_eC2-RXD9sG1rZjMl2FqE0eMQwkB0")  # Your provided API key
-
-# Initialize layers
-db_layer = DatabaseLayer()
-app_layer = ApplicationLayer(db_layer)
-
-# Authentication
-if st.session_state.page == "login":
-    login_page(app_layer)
-    st.stop()
-elif st.session_state.page == "register":
-    register_page(app_layer)
-    st.stop()
-elif st.session_state.page == "otp":
-    otp_page(app_layer)
-    st.stop()
-elif st.session_state.page == "main":
-    pass  # Continue to the chatbot
 
 # Function to load Gemini Pro model and get responses
 @st.cache_resource
@@ -54,14 +35,28 @@ chat = initialize_genai_model()
 def get_gemini_response(question):
     try:
         response = chat.send_message(question, stream=True)
-        return ''.join([chunk.text for chunk in response])
+        if not response:
+            raise ValueError("No response received from the model.")
+        return ''.join([chunk.text for chunk in response if hasattr(chunk, 'text')])
     except Exception as e:
-        return f"An error occurred: {e}"
+        # Attempt to rewind and retry once
+        try:
+            chat.rewind()
+            response = chat.send_message(question, stream=True)
+            if not response:
+                raise ValueError("No response received from the model.")
+            return ''.join([chunk.text for chunk in response if hasattr(chunk, 'text')])
+        except Exception as retry_e:
+            # Handle safety ratings and no valid text
+            if hasattr(retry_e, 'safety_ratings'):
+                safety_ratings = retry_e.safety_ratings
+                return f"The response was flagged for safety concerns: {safety_ratings}"
+            return f"An error occurred: {retry_e}"
 
 # Train or Load the Phishing Detection Model
 @st.cache_resource
 def train_and_save_model():
-    dataset_path = 'phishing.csv'  # Update this path if necessary
+    dataset_path = 'D:\\chatbot\\phishing.csv'  # Update this path if necessary
     try:
         data = pd.read_csv(dataset_path)
     except FileNotFoundError:
@@ -80,14 +75,14 @@ def train_and_save_model():
     model.fit(X_train, y_train)
 
     # Save the trained model
-    with open('model.pkl', 'wb') as file:
+    with open('D:\\chatbot\\model.pkl', 'wb') as file:
         pickle.dump(model, file)
     
     return model
 
 # Load existing model or train a new one if not found
 try:
-    with open('model.pkl', 'rb') as model_file:
+    with open('D:\\chatbot\\model.pkl', 'rb') as model_file:
         phishing_model = pickle.load(model_file)
 except (FileNotFoundError, EOFError):
     phishing_model = train_and_save_model()
@@ -102,10 +97,12 @@ def check_phishing(url):
         # Check if the URL is one of the official URLs
         official_urls = ["google.com", "www.google.com", "linkedin.com", "www.linkedin.com"]
         if domain in official_urls:
+            reason = classify_safe_reason(url)
             return {
                 "is_safe": True,
                 "prob_safe": 100,
-                "prob_phishing": 0
+                "prob_phishing": 0,
+                "reason": reason
             }
 
         # Extract features from the URL
@@ -124,13 +121,111 @@ def check_phishing(url):
         proba_safe = phishing_model.predict_proba(features)[0, 0]
         proba_phishing = phishing_model.predict_proba(features)[0, 1]
 
+        is_safe = proba_safe > 0.6
+        reason = classify_safe_reason(url) if is_safe else get_detailed_phishing_reason(url, feature_extractor)
+
         return {
-            "is_safe": prediction == 0,
+            "is_safe": is_safe,
             "prob_safe": round(proba_safe * 100, 2),
             "prob_phishing": round(proba_phishing * 100, 2),
+            "reason": reason
         }
     except Exception as e:
         return {"error": str(e)}
+
+def classify_phishing_reason(url):
+    try:
+        # Reset chat history for each new URL
+        global chat
+        chat = initialize_genai_model()
+        
+        question = f"Why is the URL '{url}' considered unsafe?"
+        response = get_gemini_response(question)
+        if "flagged for safety concerns" in response:
+            return "The URL is flagged for safety concerns and could not be processed."
+        return response
+    except Exception as e:
+        return f"An error occurred while classifying the reason: {e}"
+
+def classify_safe_reason(url):
+    try:
+        # Reset chat history for each new URL
+        global chat
+        chat = initialize_genai_model()
+        
+        question = f"Why is the URL '{url}' considered safe?"
+        response = get_gemini_response(question)
+        if "flagged for safety concerns" in response:
+            return "The URL is flagged for safety concerns and could not be processed."
+        return response
+    except Exception as e:
+        return f"An error occurred while classifying the reason: {e}"
+
+def get_detailed_phishing_reason(url, feature_extractor):
+    reasons = []
+    if feature_extractor.shortUrl() == -1:
+        reasons.append("The URL is a shortened URL, which is often used for phishing.")
+    if feature_extractor.UsingIp() == -1:
+        reasons.append("The URL uses an IP address, which is often used for phishing.")
+    if feature_extractor.symbol() == -1:
+        reasons.append("The URL contains the '@' symbol, which is often used for phishing.")
+    if feature_extractor.redirecting() == -1:
+        reasons.append("The URL contains multiple redirects, which is often used for phishing.")
+    if feature_extractor.prefixSuffix() == -1:
+        reasons.append("The URL contains a hyphen in the domain, which is often used for phishing.")
+    if feature_extractor.SubDomains() == -1:
+        reasons.append("The URL contains multiple subdomains, which is often used for phishing.")
+    if feature_extractor.Hppts() == -1:
+        reasons.append("The URL does not use HTTPS, which is often used for phishing.")
+    if feature_extractor.DomainRegLen() == -1:
+        reasons.append("The domain registration length is short, which is often used for phishing.")
+    if feature_extractor.Favicon() == -1:
+        reasons.append("The favicon is not from the same domain, which is often used for phishing.")
+    if feature_extractor.NonStdPort() == -1:
+        reasons.append("The URL uses a non-standard port, which is often used for phishing.")
+    if feature_extractor.HTTPSDomainURL() == -1:
+        reasons.append("The URL contains 'https' in the domain, which is often used for phishing.")
+    if feature_extractor.RequestURL() == -1:
+        reasons.append("The URL contains suspicious request URLs, which is often used for phishing.")
+    if feature_extractor.AnchorURL() == -1:
+        reasons.append("The URL contains suspicious anchor URLs, which is often used for phishing.")
+    if feature_extractor.LinksInScriptTags() == -1:
+        reasons.append("The URL contains suspicious links in script tags, which is often used for phishing.")
+    if feature_extractor.ServerFormHandler() == -1:
+        reasons.append("The URL contains suspicious server form handlers, which is often used for phishing.")
+    if feature_extractor.InfoEmail() == -1:
+        reasons.append("The URL contains suspicious email addresses, which is often used for phishing.")
+    if feature_extractor.AbnormalURL() == -1:
+        reasons.append("The URL is abnormal, which is often used for phishing.")
+    if feature_extractor.WebsiteForwarding() == -1:
+        reasons.append("The URL contains multiple forwards, which is often used for phishing.")
+    if feature_extractor.StatusBarCust() == -1:
+        reasons.append("The URL customizes the status bar, which is often used for phishing.")
+    if feature_extractor.DisableRightClick() == -1:
+        reasons.append("The URL disables right-click, which is often used for phishing.")
+    if feature_extractor.UsingPopupWindow() == -1:
+        reasons.append("The URL uses popup windows, which is often used for phishing.")
+    if feature_extractor.IframeRedirection() == -1:
+        reasons.append("The URL uses iframe redirection, which is often used for phishing.")
+    if feature_extractor.AgeofDomain() == -1:
+        reasons.append("The domain age is short, which is often used for phishing.")
+    if feature_extractor.DNSRecording() == -1:
+        reasons.append("The DNS recording is suspicious, which is often used for phishing.")
+    if feature_extractor.WebsiteTraffic() == -1:
+        reasons.append("The website traffic is low, which is often used for phishing.")
+    if feature_extractor.PageRank() == -1:
+        reasons.append("The page rank is low, which is often used for phishing.")
+    if feature_extractor.GoogleIndex() == -1:
+        reasons.append("The URL is not indexed by Google, which is often used for phishing.")
+    if feature_extractor.LinksPointingToPage() == -1:
+        reasons.append("The URL has few links pointing to it, which is often used for phishing.")
+    if feature_extractor.StatsReport() == -1:
+        reasons.append("The URL has a poor stats report, which is often used for phishing.")
+    
+    if not reasons:
+        reasons.append("The URL contains suspicious patterns or domains, which are often used for phishing.")
+    
+    return " ".join(reasons)
 
 # Add custom CSS for enhanced UI
 def add_custom_css():
@@ -259,9 +354,11 @@ with tab2:
             
         elif result["is_safe"]:
             st.success(f"The URL is safe ({result['prob_safe']}% confidence).")
+            st.info(f"Reason: {result['reason']}")
             
         else:
             st.error(f"The URL is phishing ({result['prob_phishing']}% confidence).")
+            st.info(f"Reason: {result['reason']}")
 
 # LangChain Features Tab
 with tab3:
