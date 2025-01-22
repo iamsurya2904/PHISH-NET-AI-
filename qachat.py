@@ -4,7 +4,7 @@ import os
 import google.generativeai as genai
 import numpy as np
 import pickle
-from Feature import FeatureExtraction
+from FeatureExtraction import FeatureExtraction
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
@@ -56,7 +56,7 @@ def get_gemini_response(question):
 # Train or Load the Phishing Detection Model
 @st.cache_resource
 def train_and_save_model():
-    dataset_path = 'D:\\chatbot\\phishing.csv'  # Update this path if necessary
+    dataset_path = 'phishing.csv'  # Update this path if necessary
     try:
         data = pd.read_csv(dataset_path)
     except FileNotFoundError:
@@ -75,14 +75,14 @@ def train_and_save_model():
     model.fit(X_train, y_train)
 
     # Save the trained model
-    with open('D:\\chatbot\\model.pkl', 'wb') as file:
+    with open('model.pkl', 'wb') as file:
         pickle.dump(model, file)
     
     return model
 
 # Load existing model or train a new one if not found
 try:
-    with open('D:\\chatbot\\model.pkl', 'rb') as model_file:
+    with open('model.pkl', 'rb') as model_file:
         phishing_model = pickle.load(model_file)
 except (FileNotFoundError, EOFError):
     phishing_model = train_and_save_model()
