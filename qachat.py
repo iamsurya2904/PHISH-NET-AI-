@@ -4,7 +4,7 @@ import os
 import google.generativeai as genai
 import numpy as np
 import pickle
-from FeatureExtraction import FeatureExtraction
+from Feature import FeatureExtraction
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
@@ -122,7 +122,7 @@ def check_phishing(url):
         proba_phishing = phishing_model.predict_proba(features)[0, 1]
 
         is_safe = proba_safe > 0.6
-        reason = classify_safe_reason(url) if is_safe else get_detailed_phishing_reason(url, feature_extractor)
+        reason = get_detailed_safe_reason(url, feature_extractor) if is_safe else get_detailed_phishing_reason(url, feature_extractor)
 
         return {
             "is_safe": is_safe,
@@ -160,6 +160,72 @@ def classify_safe_reason(url):
         return response
     except Exception as e:
         return f"An error occurred while classifying the reason: {e}"
+
+def get_detailed_safe_reason(url, feature_extractor):
+    reasons = []
+    if feature_extractor.shortUrl() == 1:
+        reasons.append("The URL is not a shortened URL, which is a good sign.")
+    if feature_extractor.UsingIp() == 1:
+        reasons.append("The URL does not use an IP address, which is a good sign.")
+    if feature_extractor.symbol() == 1:
+        reasons.append("The URL does not contain the '@' symbol, which is a good sign.")
+    if feature_extractor.redirecting() == 1:
+        reasons.append("The URL does not contain multiple redirects, which is a good sign.")
+    if feature_extractor.prefixSuffix() == 1:
+        reasons.append("The URL does not contain a hyphen in the domain, which is a good sign.")
+    if feature_extractor.SubDomains() == 1:
+        reasons.append("The URL does not contain multiple subdomains, which is a good sign.")
+    if feature_extractor.Hppts() == 1:
+        reasons.append("The URL uses HTTPS, which is a good sign.")
+    if feature_extractor.DomainRegLen() == 1:
+        reasons.append("The domain registration length is long, which is a good sign.")
+    if feature_extractor.Favicon() == 1:
+        reasons.append("The favicon is from the same domain, which is a good sign.")
+    if feature_extractor.NonStdPort() == 1:
+        reasons.append("The URL uses a standard port, which is a good sign.")
+    if feature_extractor.HTTPSDomainURL() == 1:
+        reasons.append("The URL does not contain 'https' in the domain, which is a good sign.")
+    if feature_extractor.RequestURL() == 1:
+        reasons.append("The URL does not contain suspicious request URLs, which is a good sign.")
+    if feature_extractor.AnchorURL() == 1:
+        reasons.append("The URL does not contain suspicious anchor URLs, which is a good sign.")
+    if feature_extractor.LinksInScriptTags() == 1:
+        reasons.append("The URL does not contain suspicious links in script tags, which is a good sign.")
+    if feature_extractor.ServerFormHandler() == 1:
+        reasons.append("The URL does not contain suspicious server form handlers, which is a good sign.")
+    if feature_extractor.InfoEmail() == 1:
+        reasons.append("The URL does not contain suspicious email addresses, which is a good sign.")
+    if feature_extractor.AbnormalURL() == 1:
+        reasons.append("The URL is normal, which is a good sign.")
+    if feature_extractor.WebsiteForwarding() == 1:
+        reasons.append("The URL does not contain multiple forwards, which is a good sign.")
+    if feature_extractor.StatusBarCust() == 1:
+        reasons.append("The URL does not customize the status bar, which is a good sign.")
+    if feature_extractor.DisableRightClick() == 1:
+        reasons.append("The URL does not disable right-click, which is a good sign.")
+    if feature_extractor.UsingPopupWindow() == 1:
+        reasons.append("The URL does not use popup windows, which is a good sign.")
+    if feature_extractor.IframeRedirection() == 1:
+        reasons.append("The URL does not use iframe redirection, which is a good sign.")
+    if feature_extractor.AgeofDomain() == 1:
+        reasons.append("The domain age is long, which is a good sign.")
+    if feature_extractor.DNSRecording() == 1:
+        reasons.append("The DNS recording is normal, which is a good sign.")
+    if feature_extractor.WebsiteTraffic() == 1:
+        reasons.append("The website traffic is high, which is a good sign.")
+    if feature_extractor.PageRank() == 1:
+        reasons.append("The page rank is high, which is a good sign.")
+    if feature_extractor.GoogleIndex() == 1:
+        reasons.append("The URL is indexed by Google, which is a good sign.")
+    if feature_extractor.LinksPointingToPage() == 1:
+        reasons.append("The URL has many links pointing to it, which is a good sign.")
+    if feature_extractor.StatsReport() == 1:
+        reasons.append("The URL has a good stats report, which is a good sign.")
+    
+    if not reasons:
+        reasons.append("The URL does not contain any suspicious patterns or domains, which is a good sign.")
+    
+    return " ".join(reasons)
 
 def get_detailed_phishing_reason(url, feature_extractor):
     reasons = []
