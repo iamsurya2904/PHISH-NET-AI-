@@ -10,6 +10,9 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 from langchain_utils import summarize_with_langchain, qa_with_langchain  # Import LangChain functions
 from urllib.parse import urlparse
+import plotly.graph_objs as go
+from PIL import Image
+import streamlit.components.v1 as components
 
 try:
     from langchain_community.document_loaders import UnstructuredFileLoader
@@ -37,7 +40,10 @@ def get_gemini_response(question):
         response = chat.send_message(question, stream=True)
         if not response:
             raise ValueError("No response received from the model.")
-        return ''.join([chunk.text for chunk in response if hasattr(chunk, 'text')])
+        valid_text = ''.join([chunk.text for chunk in response if hasattr(chunk, 'text')])
+        if not valid_text:
+            raise ValueError("No valid text received from the model.")
+        return valid_text
     except Exception as e:
         # Attempt to rewind and retry once
         try:
@@ -45,13 +51,16 @@ def get_gemini_response(question):
             response = chat.send_message(question, stream=True)
             if not response:
                 raise ValueError("No response received from the model.")
-            return ''.join([chunk.text for chunk in response if hasattr(chunk, 'text')])
+            valid_text = ''.join([chunk.text for chunk in response if hasattr(chunk, 'text')])
+            if not valid_text:
+                raise ValueError("No valid text received from the model.")
+            return valid_text
         except Exception as retry_e:
             # Handle safety ratings and no valid text
             if hasattr(retry_e, 'safety_ratings'):
                 safety_ratings = retry_e.safety_ratings
                 return f"The response was flagged for safety concerns: {safety_ratings}"
-            return f"An error occurred: {retry_e}"
+            return "An error occurred while processing your request. Please try again later."
 
 # Train or Load the Phishing Detection Model
 @st.cache_resource
@@ -109,6 +118,9 @@ def check_phishing(url):
         feature_extractor = FeatureExtraction(url)
         features = np.array(feature_extractor.getFeaturesList()).reshape(1, -1)
 
+        # Debugging: Log extracted features
+        st.write("Extracted Features:", features)
+
         # Adjust features dynamically to match model input size
         required_features = phishing_model.n_features_in_
         if features.shape[1] < required_features:
@@ -116,13 +128,26 @@ def check_phishing(url):
         elif features.shape[1] > required_features:
             features = features[:, :required_features]
 
+        # Debugging: Log adjusted features
+        st.write("Adjusted Features:", features)
+
         # Model prediction
         prediction = phishing_model.predict(features)[0]
         proba_safe = phishing_model.predict_proba(features)[0, 0]
         proba_phishing = phishing_model.predict_proba(features)[0, 1]
 
-        is_safe = proba_safe > 0.6
-        reason = get_detailed_safe_reason(url, feature_extractor) if is_safe else get_detailed_phishing_reason(url, feature_extractor)
+        # Debugging: Log model predictions
+        st.write("Model Prediction:", prediction)
+        st.write("Probability Safe:", proba_safe)
+        st.write("Probability Phishing:", proba_phishing)
+
+        # Adjust threshold for classification
+        is_safe = proba_safe > 0.5  # Adjusted threshold for "safe" classification
+
+        if is_safe:
+            reason = get_detailed_safe_reason(url, feature_extractor)
+        else:
+            reason = get_detailed_phishing_reason(url, feature_extractor)
 
         return {
             "is_safe": is_safe,
@@ -162,141 +187,36 @@ def classify_safe_reason(url):
         return f"An error occurred while classifying the reason: {e}"
 
 def get_detailed_safe_reason(url, feature_extractor):
-    reasons = []
-    if feature_extractor.shortUrl() == 1:
-        reasons.append("The URL is not a shortened URL, which is a good sign.")
-    if feature_extractor.UsingIp() == 1:
-        reasons.append("The URL does not use an IP address, which is a good sign.")
-    if feature_extractor.symbol() == 1:
-        reasons.append("The URL does not contain the '@' symbol, which is a good sign.")
-    if feature_extractor.redirecting() == 1:
-        reasons.append("The URL does not contain multiple redirects, which is a good sign.")
-    if feature_extractor.prefixSuffix() == 1:
-        reasons.append("The URL does not contain a hyphen in the domain, which is a good sign.")
-    if feature_extractor.SubDomains() == 1:
-        reasons.append("The URL does not contain multiple subdomains, which is a good sign.")
-    if feature_extractor.Hppts() == 1:
-        reasons.append("The URL uses HTTPS, which is a good sign.")
-    if feature_extractor.DomainRegLen() == 1:
-        reasons.append("The domain registration length is long, which is a good sign.")
-    if feature_extractor.Favicon() == 1:
-        reasons.append("The favicon is from the same domain, which is a good sign.")
-    if feature_extractor.NonStdPort() == 1:
-        reasons.append("The URL uses a standard port, which is a good sign.")
-    if feature_extractor.HTTPSDomainURL() == 1:
-        reasons.append("The URL does not contain 'https' in the domain, which is a good sign.")
-    if feature_extractor.RequestURL() == 1:
-        reasons.append("The URL does not contain suspicious request URLs, which is a good sign.")
-    if feature_extractor.AnchorURL() == 1:
-        reasons.append("The URL does not contain suspicious anchor URLs, which is a good sign.")
-    if feature_extractor.LinksInScriptTags() == 1:
-        reasons.append("The URL does not contain suspicious links in script tags, which is a good sign.")
-    if feature_extractor.ServerFormHandler() == 1:
-        reasons.append("The URL does not contain suspicious server form handlers, which is a good sign.")
-    if feature_extractor.InfoEmail() == 1:
-        reasons.append("The URL does not contain suspicious email addresses, which is a good sign.")
-    if feature_extractor.AbnormalURL() == 1:
-        reasons.append("The URL is normal, which is a good sign.")
-    if feature_extractor.WebsiteForwarding() == 1:
-        reasons.append("The URL does not contain multiple forwards, which is a good sign.")
-    if feature_extractor.StatusBarCust() == 1:
-        reasons.append("The URL does not customize the status bar, which is a good sign.")
-    if feature_extractor.DisableRightClick() == 1:
-        reasons.append("The URL does not disable right-click, which is a good sign.")
-    if feature_extractor.UsingPopupWindow() == 1:
-        reasons.append("The URL does not use popup windows, which is a good sign.")
-    if feature_extractor.IframeRedirection() == 1:
-        reasons.append("The URL does not use iframe redirection, which is a good sign.")
-    if feature_extractor.AgeofDomain() == 1:
-        reasons.append("The domain age is long, which is a good sign.")
-    if feature_extractor.DNSRecording() == 1:
-        reasons.append("The DNS recording is normal, which is a good sign.")
-    if feature_extractor.WebsiteTraffic() == 1:
-        reasons.append("The website traffic is high, which is a good sign.")
-    if feature_extractor.PageRank() == 1:
-        reasons.append("The page rank is high, which is a good sign.")
-    if feature_extractor.GoogleIndex() == 1:
-        reasons.append("The URL is indexed by Google, which is a good sign.")
-    if feature_extractor.LinksPointingToPage() == 1:
-        reasons.append("The URL has many links pointing to it, which is a good sign.")
-    if feature_extractor.StatsReport() == 1:
-        reasons.append("The URL has a good stats report, which is a good sign.")
-    
-    if not reasons:
-        reasons.append("The URL does not contain any suspicious patterns or domains, which is a good sign.")
-    
-    return " ".join(reasons)
+    try:
+        global chat
+        chat = initialize_genai_model()
+        
+        question = f"Why is the URL '{url}' considered safe?"
+        response = get_gemini_response(question)
+        if "flagged for safety concerns" in response:
+            return "The URL is flagged for safety concerns and could not be processed."
+        return response
+    except Exception as e:
+        return f"An error occurred while classifying the reason: {e}"
 
 def get_detailed_phishing_reason(url, feature_extractor):
-    reasons = []
-    if feature_extractor.shortUrl() == -1:
-        reasons.append("The URL is a shortened URL, which is often used for phishing.")
-    if feature_extractor.UsingIp() == -1:
-        reasons.append("The URL uses an IP address, which is often used for phishing.")
-    if feature_extractor.symbol() == -1:
-        reasons.append("The URL contains the '@' symbol, which is often used for phishing.")
-    if feature_extractor.redirecting() == -1:
-        reasons.append("The URL contains multiple redirects, which is often used for phishing.")
-    if feature_extractor.prefixSuffix() == -1:
-        reasons.append("The URL contains a hyphen in the domain, which is often used for phishing.")
-    if feature_extractor.SubDomains() == -1:
-        reasons.append("The URL contains multiple subdomains, which is often used for phishing.")
-    if feature_extractor.Hppts() == -1:
-        reasons.append("The URL does not use HTTPS, which is often used for phishing.")
-    if feature_extractor.DomainRegLen() == -1:
-        reasons.append("The domain registration length is short, which is often used for phishing.")
-    if feature_extractor.Favicon() == -1:
-        reasons.append("The favicon is not from the same domain, which is often used for phishing.")
-    if feature_extractor.NonStdPort() == -1:
-        reasons.append("The URL uses a non-standard port, which is often used for phishing.")
-    if feature_extractor.HTTPSDomainURL() == -1:
-        reasons.append("The URL contains 'https' in the domain, which is often used for phishing.")
-    if feature_extractor.RequestURL() == -1:
-        reasons.append("The URL contains suspicious request URLs, which is often used for phishing.")
-    if feature_extractor.AnchorURL() == -1:
-        reasons.append("The URL contains suspicious anchor URLs, which is often used for phishing.")
-    if feature_extractor.LinksInScriptTags() == -1:
-        reasons.append("The URL contains suspicious links in script tags, which is often used for phishing.")
-    if feature_extractor.ServerFormHandler() == -1:
-        reasons.append("The URL contains suspicious server form handlers, which is often used for phishing.")
-    if feature_extractor.InfoEmail() == -1:
-        reasons.append("The URL contains suspicious email addresses, which is often used for phishing.")
-    if feature_extractor.AbnormalURL() == -1:
-        reasons.append("The URL is abnormal, which is often used for phishing.")
-    if feature_extractor.WebsiteForwarding() == -1:
-        reasons.append("The URL contains multiple forwards, which is often used for phishing.")
-    if feature_extractor.StatusBarCust() == -1:
-        reasons.append("The URL customizes the status bar, which is often used for phishing.")
-    if feature_extractor.DisableRightClick() == -1:
-        reasons.append("The URL disables right-click, which is often used for phishing.")
-    if feature_extractor.UsingPopupWindow() == -1:
-        reasons.append("The URL uses popup windows, which is often used for phishing.")
-    if feature_extractor.IframeRedirection() == -1:
-        reasons.append("The URL uses iframe redirection, which is often used for phishing.")
-    if feature_extractor.AgeofDomain() == -1:
-        reasons.append("The domain age is short, which is often used for phishing.")
-    if feature_extractor.DNSRecording() == -1:
-        reasons.append("The DNS recording is suspicious, which is often used for phishing.")
-    if feature_extractor.WebsiteTraffic() == -1:
-        reasons.append("The website traffic is low, which is often used for phishing.")
-    if feature_extractor.PageRank() == -1:
-        reasons.append("The page rank is low, which is often used for phishing.")
-    if feature_extractor.GoogleIndex() == -1:
-        reasons.append("The URL is not indexed by Google, which is often used for phishing.")
-    if feature_extractor.LinksPointingToPage() == -1:
-        reasons.append("The URL has few links pointing to it, which is often used for phishing.")
-    if feature_extractor.StatsReport() == -1:
-        reasons.append("The URL has a poor stats report, which is often used for phishing.")
-    
-    if not reasons:
-        reasons.append("The URL contains suspicious patterns or domains, which are often used for phishing.")
-    
-    return " ".join(reasons)
+    try:
+        global chat
+        chat = initialize_genai_model()
+        
+        question = f"Why is the URL '{url}' considered unsafe?"
+        response = get_gemini_response(question)
+        if "flagged for safety concerns" in response:
+            return "The URL is flagged for safety concerns and could not be processed."
+        return response
+    except Exception as e:
+        return f"An error occurred while classifying the reason: {e}"
 
 # Add custom CSS for enhanced UI
 def add_custom_css():
     st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
     body {
         background: linear-gradient(to right, #1e1e2f, #121212);
         color: #fff;
@@ -322,6 +242,8 @@ def add_custom_css():
     .stTextInput>div>div>input {
         border-radius: 5px;
         padding: 10px;
+        background-color: #2b2b38;
+        color: #fff;
     }
     .stAlert {
         border-radius: 5px;
@@ -333,8 +255,153 @@ def add_custom_css():
 
 add_custom_css()
 
+# Add 3D particle background
+particles_js = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particles.js</title>
+  <style>
+  #particles-js {
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    top: 0;
+    left: 0;
+    z-index: -1; /* Send the animation to the back */
+  }
+  .content {
+    position: relative;
+    z-index: 1;
+    color: white;
+  }
+  </style>
+</head>
+<body>
+  <div id="particles-js"></div>
+  <div class="content">
+    <!-- Placeholder for Streamlit content -->
+  </div>
+  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  <script>
+    particlesJS("particles-js", {
+      "particles": {
+        "number": {
+          "value": 300,
+          "density": {
+            "enable": true,
+            "value_area": 800
+          }
+        },
+        "color": {
+          "value": "#ffffff"
+        },
+        "shape": {
+          "type": "circle",
+          "stroke": {
+            "width": 0,
+            "color": "#000000"
+          },
+          "polygon": {
+            "nb_sides": 5
+          },
+          "image": {
+            "src": "img/github.svg",
+            "width": 100,
+            "height": 100
+          }
+        },
+        "opacity": {
+          "value": 0.5,
+          "random": false,
+          "anim": {
+            "enable": false,
+            "speed": 1,
+            "opacity_min": 0.2,
+            "sync": false
+          }
+        },
+        "size": {
+          "value": 2,
+          "random": true,
+          "anim": {
+            "enable": false,
+            "speed": 40,
+            "size_min": 0.1,
+            "sync": false
+          }
+        },
+        "line_linked": {
+          "enable": true,
+          "distance": 100,
+          "color": "#ffffff",
+          "opacity": 0.22,
+          "width": 1
+        },
+        "move": {
+          "enable": true,
+          "speed": 0.2,
+          "direction": "none",
+          "random": false,
+          "straight": false,
+          "out_mode": "out",
+          "bounce": true,
+          "attract": {
+            "enable": false,
+            "rotateX": 600,
+            "rotateY": 1200
+          }
+        }
+      },
+      "interactivity": {
+        "detect_on": "canvas",
+        "events": {
+          "onhover": {
+            "enable": true,
+            "mode": "grab"
+          },
+          "onclick": {
+            "enable": true,
+            "mode": "repulse"
+          },
+          "resize": true
+        },
+        "modes": {
+          "grab": {
+            "distance": 100,
+            "line_linked": {
+              "opacity": 1
+            }
+          },
+          "bubble": {
+            "distance": 400,
+            "size": 2,
+            "duration": 2,
+            "opacity": 0.5,
+            "speed": 1
+          },
+          "repulse": {
+            "distance": 200,
+            "duration": 0.4
+          },
+          "push": {
+            "particles_nb": 2
+          },
+          "remove": {
+            "particles_nb": 3
+          }
+        }
+      },
+      "retina_detect": true
+    });
+  </script>
+</body>
+</html>
+"""
+
 # Streamlit UI setup
-st.title("💬 PhishNetUI - Chatbot with Phishing Detector")
+st.markdown("<h1 style='font-family: VT323, monospace;'>💬 PhishNetUI - Chatbot with Phishing Detector</h1>", unsafe_allow_html=True)
 st.caption("🚀 A Streamlit chatbot powered by Google Gemini AI")
 
 if "messages" not in st.session_state:
@@ -451,3 +518,6 @@ with tab3:
                     st.write(answer)
                 else:
                     st.warning("Please upload a document first.")
+
+# Add the 3D particle background
+components.html(particles_js, height=370, scrolling=False)
