@@ -16,7 +16,7 @@ unstructured[docx,pdf,image,ppt,json,html,xml,xls,log,csv,tsv,txt,conf,ini,cfg,a
 python-dateutil
 pyotp
 pyDes
-ploty
+plotly
 python-docx
 transformers
 exifread
