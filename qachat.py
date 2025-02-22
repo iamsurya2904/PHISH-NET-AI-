@@ -4,7 +4,7 @@ import os
 import google.generativeai as genai
 import numpy as np
 import pickle
-from Feature import FeatureExtraction
+from FeatureExtraction import FeatureExtraction
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
