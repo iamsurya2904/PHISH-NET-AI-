@@ -4,11 +4,14 @@ import os
 import google.generativeai as genai
 import numpy as np
 import pickle
-from FeatureExtraction import FeatureExtraction
+from Feature import FeatureExtraction
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 import pandas as pd
-from langchain_utils import summarize_with_langchain, qa_with_langchain  # Import LangChain functions
+try:
+    from langchain_utils import summarize_text, load_input_file, STYLES, LANGUAGES  # Import LangChain functions
+except FileNotFoundError as e:
+    raise FileNotFoundError(f"Error importing langchain_utils: {e}")
 from urllib.parse import urlparse
 import plotly.graph_objs as go
 from PIL import Image
@@ -18,6 +21,11 @@ try:
     from langchain_community.document_loaders import UnstructuredFileLoader
 except ImportError:
     raise ImportError("The 'unstructured' package is not found. Please install it with 'pip install unstructured'.")
+except ModuleNotFoundError:
+    raise ModuleNotFoundError("The 'exceptions' module is not found. Please install it or check your environment.")
+
+import requests
+import time
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="PhishNet AI", layout="wide")
@@ -99,64 +107,47 @@ except (FileNotFoundError, EOFError):
 # Function to check if a URL is phishing or safe
 def check_phishing(url):
     try:
-        # Parse the domain from the URL
-        parsed_url = urlparse(url)
-        domain = parsed_url.netloc.lower()
-        
-        # Check if the URL is one of the official URLs
-        official_urls = ["google.com", "www.google.com", "linkedin.com", "www.linkedin.com"]
-        if domain in official_urls:
-            reason = classify_safe_reason(url)
-            return {
-                "is_safe": True,
-                "prob_safe": 100,
-                "prob_phishing": 0,
-                "reason": reason
-            }
-
         # Extract features from the URL
         feature_extractor = FeatureExtraction(url)
-        features = np.array(feature_extractor.getFeaturesList()).reshape(1, -1)
+        features = np.array(feature_extractor.extract_features()).reshape(1, -1)
 
-        # Debugging: Log extracted features
-        st.write("Extracted Features:", features)
-
-        # Adjust features dynamically to match model input size
+        # Adjust features dynamically to match the model input size
         required_features = phishing_model.n_features_in_
         if features.shape[1] < required_features:
             features = np.pad(features, ((0, 0), (0, required_features - features.shape[1])), constant_values=0)
         elif features.shape[1] > required_features:
             features = features[:, :required_features]
 
-        # Debugging: Log adjusted features
-        st.write("Adjusted Features:", features)
-
         # Model prediction
         prediction = phishing_model.predict(features)[0]
         proba_safe = phishing_model.predict_proba(features)[0, 0]
         proba_phishing = phishing_model.predict_proba(features)[0, 1]
 
-        # Debugging: Log model predictions
-        st.write("Model Prediction:", prediction)
-        st.write("Probability Safe:", proba_safe)
-        st.write("Probability Phishing:", proba_phishing)
+        # Determine if the URL is safe
+        is_safe = proba_safe > 0.6  # Confidence threshold for safe classification
 
-        # Adjust threshold for classification
-        is_safe = proba_safe > 0.5  # Adjusted threshold for "safe" classification
-
+        # Generate reasons based on prediction
         if is_safe:
-            reason = get_detailed_safe_reason(url, feature_extractor)
+            reason = classify_safe_reason(url)
+            message = f"The URL is safe ({round(proba_safe * 100, 2)}% confidence)."
         else:
-            reason = get_detailed_phishing_reason(url, feature_extractor)
+            reason = classify_phishing_reason(url)
+            message = f"The URL is phishing ({round(proba_phishing * 100, 2)}% confidence)."
 
+        # Return result dictionary
         return {
             "is_safe": is_safe,
             "prob_safe": round(proba_safe * 100, 2),
             "prob_phishing": round(proba_phishing * 100, 2),
-            "reason": reason
+            "message": message,
+            "reason": reason,
         }
+    except ValueError as ve:
+        return {"error": f"Value error occurred: {ve}"}
+    except FileNotFoundError as fnfe:
+        return {"error": f"File not found: {fnfe}"}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"An unexpected error occurred: {e}"}
 
 def classify_phishing_reason(url):
     try:
@@ -211,6 +202,38 @@ def get_detailed_phishing_reason(url, feature_extractor):
         return response
     except Exception as e:
         return f"An error occurred while classifying the reason: {e}"
+
+def check_email_breaches(email):
+    api_url = f"https://api.xposedornot.com/v1/check-email/{email}"
+    try:
+        response = requests.get(api_url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        return {"Error": str(e)}
+
+def get_breach_analytics(email, retries=3, backoff_factor=1):
+    api_url = f"https://api.xposedornot.com/v1/breach-analytics?email={email}"
+    for attempt in range(retries):
+        try:
+            response = requests.get(api_url)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if response.status_code == 429 and attempt < retries - 1:
+                sleep_time = backoff_factor * (2 ** attempt)
+                time.sleep(sleep_time)
+            elif response.status_code == 403:
+                return {"Error": "Access forbidden. Please check your API key or permissions."}
+            else:
+                return {"Error": str(e)}
+
+def summarize_breach_analytics(analytics):
+    try:
+        summary = get_gemini_response(f"Summarize the following breach analytics: {analytics}")
+        return summary
+    except Exception as e:
+        return f"An error occurred while summarizing the analytics: {e}"
 
 # Add custom CSS for enhanced UI
 def add_custom_css():
@@ -418,7 +441,7 @@ if prompt := st.chat_input():
     st.chat_message("assistant").write(response)
 
 # Tabs for organization
-tab1, tab2, tab3 = st.tabs(["💬 Chatbot", "🔍 Phishing Detection", "📄 LangChain Features"])
+tab1, tab2, tab3, tab4 = st.tabs(["💬 Chatbot", "🔍 Phishing Detection", "📄 LangChain Features", "📧 Email Breach Check"])
 
 # Chatbot Tab
 with tab1:
@@ -430,7 +453,7 @@ with tab1:
     col1, col2 = st.columns([8, 2])
 
     with col1:
-        input_text = st.text_input("Ask the chatbot something:", key="chat_input")
+        input_text = st.text_input("Ask the chatbot something:", key="chat_input_main")
 
     with col2:
         file_uploaded = st.file_uploader("", key="document_uploader")
@@ -448,14 +471,15 @@ with tab1:
 
     if file_uploaded:
         try:
-            summary = summarize_with_langchain(file_uploaded)
+            content = file_uploaded.read().decode('utf-8', errors='ignore')
+            summary = summarize_text(content, "Detailed", "English")
             if summary:
                 st.subheader("Document Summary")
                 st.write(summary)
                 
-                question = st.text_input("Ask a question about the document:")
-                if st.button("Get Answer"):
-                    answer = qa_with_langchain(question, summary)
+                question = st.text_input("Ask a question about the document:", key="document_question")
+                if st.button("Get Answer", key="get_answer_button"):
+                    answer = get_gemini_response(question)
                     if answer:
                         st.subheader("Answer")
                         st.write(answer)
@@ -479,45 +503,71 @@ with tab2:
     submit_url = st.button("Check URL")
 
     if submit_url and url_input:
-        
         result = check_phishing(url_input)
-        
         if "error" in result:
             st.error(f"An error occurred: {result['error']}")
-            
         elif result["is_safe"]:
-            st.success(f"The URL is safe ({result['prob_safe']}% confidence).")
+            st.success(f"{result['message']}")
             st.info(f"Reason: {result['reason']}")
-            
         else:
-            st.error(f"The URL is phishing ({result['prob_phishing']}% confidence).")
-            st.info(f"Reason: {result['reason']}")
+            st.error(f"{result['message']}")
+            st.warning(f"Reason: {result['reason']}")
 
 # LangChain Features Tab
 with tab3:
-    
     st.subheader("LangChain Features")
     
     file_upload = st.file_uploader("Upload a document for summarization or QA:")
     
     if file_upload:
+        content = load_input_file(file_upload)
         
-        summary = summarize_with_langchain(file_upload)
-        
-        if summary:
+        if content:
             st.subheader("Summary")
+            style = st.selectbox("Select summary style:", options=list(STYLES.keys()))
+            language = st.selectbox("Select language:", options=LANGUAGES)
+            summary = summarize_text(content, style, language)
             st.write(summary)
 
             question = st.text_input("Ask a question about the document:")
             
             if st.button("Get Answer"):
-                answer = qa_with_langchain(question, summary)
-                
+                answer = get_gemini_response(question)
                 if answer:
                     st.subheader("Answer")
                     st.write(answer)
                 else:
-                    st.warning("Please upload a document first.")
+                    st.warning("No answer could be generated.")
+
+# Email Breach Check Tab
+with tab4:
+    st.subheader("Email Breach Check Section")
+    
+    email_input = st.text_input("Enter an email to check for breaches:", key="email_breach_input")
+    
+    if st.button("Check Email Breaches"):
+        if email_input:
+            result = check_email_breaches(email_input)
+            if "Error" in result:
+                st.error(f"An error occurred: {result['Error']}")
+            else:
+                st.json(result)
+        else:
+            st.warning("Please enter an email address.")
+    
+    if st.button("Get Breach Analytics"):
+        if email_input:
+            result = get_breach_analytics(email_input)
+            if "Error" in result:
+                st.error(f"An error occurred: {result['Error']}")
+            else:
+                st.json(result)
+                if st.button("Summarize and Explain Analytics"):
+                    summary = summarize_breach_analytics(result)
+                    st.subheader("Analytics Summary")
+                    st.write(summary)
+        else:
+            st.warning("Please enter an email address.")
 
 # Add the 3D particle background
 components.html(particles_js, height=370, scrolling=False)
