@@ -1,53 +1,70 @@
 # 💬 PhishNetAI: AI-Powered Phishing Detection & Email Breach Analysis
 
-PhishNetAI is a comprehensive, AI-driven web application designed to enhance cybersecurity awareness and analysis. Built using Streamlit, this tool integrates Google Gemini AI, LangChain, and ML-based phishing detection to provide users with real-time threat analysis, document summarization, and email breach tracking.
+**PhishNetAI** is a comprehensive, AI-driven web application designed to enhance cybersecurity awareness and real-time analysis. Built using **Streamlit**, this tool integrates **Google Gemini AI**, **LangChain**, and **ML-powered phishing detection** to deliver intelligent threat detection, document summarization, and email breach tracking—all in one seamless platform.
 
 ![PhishNetAI Screenshot](https://user-images.githubusercontent.com/example/phishnetai.png)
 
- 🚀 Features
+---
 
-🧠 AI Chatbot (Gemini-Powered)
-- Interact with Google Gemini 1.5 for contextual chat.
-- Summarize documents or get answers using LLMs.
-- Real-time conversation history.
+## 🏆 Achievements
 
-🕵️ URL Phishing Detection
-- Gradient Boosting Classifier-based detection.
-- Real-time phishing prediction with confidence score.
-- Feature extraction via `FeatureExtraction` class.
-- Gemini-generated explanations for results.
+🚀 **Presented at ImpactX2.0 – IEEE Edition**  
+📅 January 2025 | 📍 St. Joseph’s College of Engineering
 
-📄 LangChain Document Q&A
-- Upload files and ask contextual questions.
-- Generate summaries in various styles and languages.
+🚓 **Showcased at Cyberthon 2025**  
+🎖️ Hosted by **Tamil Nadu Police**  
+📅 March 2025 | 📍 Kumaraguru College of Technology, Coimbatore
 
-📧 Email Breach Check
-- Integrates with `XposedOrNot` API.
-- Scan emails for known data breaches.
-- Generate analytics and receive security best practices.
+> _PhishNetAI was highly appreciated by cybersecurity experts and law enforcement mentors for its practical application in phishing detection, AI-assisted analysis, and public awareness._
 
-✨ UI Enhancements
-- Dark-themed custom CSS.
-- 3D particle background using `particles.js`.
-- Tabbed navigation and interactive widgets.
+---
 
+## 🚀 Features
 
+### 🧠 AI Chatbot (Gemini-Powered)
+- Interact with **Google Gemini 1.5** for contextual chats.
+- Summarize uploaded documents or get LLM-powered insights.
+- Maintains real-time conversational history.
 
-🛠️ Tech Stack
+### 🕵️ URL Phishing Detection
+- Uses a **Gradient Boosting Classifier** to detect phishing.
+- Returns prediction with confidence score.
+- Feature engineering via `FeatureExtraction.py`.
+- Results are explained by Gemini in human-readable terms.
 
-| Component | Technology |
-|----------|-------------|
-| Frontend | Streamlit, Plotly |
-| Backend | Python, scikit-learn, LangChain |
-| LLM | Google Gemini (gemini-1.5-flash) |
-| ML Model | GradientBoostingClassifier |
-| Breach Check | `xposedornot.com` API |
-| Utilities | dotenv, NumPy, pandas, Pickle |
+### 📄 LangChain Document Q&A
+- Upload PDFs, DOCX, or text files.
+- Ask context-based questions and receive precise answers.
+- Get summaries in multiple languages or tones.
 
-🔧 Setup Instructions
+### 📧 Email Breach Check
+- Integrates with `xposedornot.com` API.
+- Verifies if an email is part of a known breach.
+- Offers actionable security tips based on exposure.
 
-1. Clone the Repository
+### ✨ UI Enhancements
+- Fully responsive **dark theme**
+- 3D **particle effects** using `particles.js`
+- Tabbed navigation and interactive widgets via Streamlit & Plotly
 
+---
+
+## 🛠️ Tech Stack
+
+| Component      | Technology                          |
+|----------------|--------------------------------------|
+| Frontend       | Streamlit, Plotly                    |
+| Backend        | Python, scikit-learn, LangChain      |
+| LLM            | Google Gemini (gemini-1.5-flash)     |
+| ML Model       | GradientBoostingClassifier           |
+| API Integration| XposedOrNot (Data breach check)      |
+| Utilities      | dotenv, NumPy, pandas, Pickle        |
+
+---
+
+## 🔧 Setup Instructions
+
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/yourusername/phishnetai.git
 cd phishnetai
@@ -57,22 +74,23 @@ Copy
 Edit
 pip install -r requirements.txt
 3. Environment Variables
-Create a .env file and add your Gemini API key:
+Create a .env file:
 
 env
 Copy
 Edit
 GOOGLE_API_KEY=your-gemini-api-key
 4. Model & Dataset Setup
-Ensure the following paths are set correctly in qachat.py:
+Ensure paths are set in qachat.py:
 
+python
+Copy
+Edit
 Dataset CSV: D:/chatbot/phishing.csv
+Model File: D:/chatbot/model.pkl
+You can refactor the script to dynamically accept paths or use os.path.
 
-Trained model: D:/chatbot/model.pkl
-
-Or modify the script to dynamically accept alternate paths.
-
-5. Run the App
+5. Run the Application
 bash
 Copy
 Edit
@@ -83,35 +101,46 @@ Copy
 Edit
 phishnetai/
 │
-├── qachat.py                   # Main Streamlit application
-├── Feature.py                  # Feature extraction logic for URLs
-├── langchain_utils.py          # Document summarization & Q&A
-├── requirements.txt            # Dependencies
-└── README.md                   # This file
+├── qachat.py              # Main Streamlit app
+├── Feature.py             # URL feature extraction
+├── langchain_utils.py     # LangChain integration
+├── requirements.txt       # Python dependencies
+└── README.md              # This documentation
 🧪 Sample Use Cases
-🛡️ Verify if a suspicious URL is safe or phishing.
+🛡️ Check if a suspicious URL is phishing.
 
-📩 Check whether your email has been involved in a breach.
+📩 Verify if your email has been leaked.
 
-📚 Ask questions about research papers, resumes, or legal docs.
+📚 Ask questions from research papers or policies.
 
-💬 Have natural conversations with Gemini AI.
+💬 Interact with Google Gemini for real-time answers.
 
 🚨 Limitations & Notes
-Only supports Gemini 1.5 flash model for now.
+Only supports Gemini 1.5 Flash model (as of now).
 
-Relies on external services (XposedOrNot, Google AI) — rate limits may apply.
+External services like Gemini & XposedOrNot may enforce rate limits.
 
-The current path for the dataset and model is hardcoded and platform-specific (Windows). Update it for cross-platform use.
+File paths for dataset/model are Windows-specific – update for cross-platform.
 
 🤝 Contributing
-Contributions are welcome! To propose a feature or bugfix:
+We welcome contributions!
 
 Fork the repo
 
-Create a new branch (feature/your-feature)
+Create a feature branch: feature/your-feature
 
-Push changes and open a PR
+Commit your changes
+
+Open a pull request (PR) with proper documentation
 
 📜 License
-Distributed under the MIT License. See LICENSE for details
+Distributed under the MIT License. See LICENSE for details.
+
+🙌 Acknowledgements
+IEEE ImpactX2.0 mentors for strategic input
+
+Tamil Nadu Police Cyber Crime Division for field insights
+
+The entire PhishNetAI team for collaborative development
+
+“In the era of AI and cyber warfare, staying informed isn’t optional — it’s essential.”
